@@ -1,4 +1,5 @@
 from tools import get_description
+from memory import memory
 #constant
 MAX_CONTENT_CHARS=8000
 KEEP_RECENT=4  
@@ -66,3 +67,31 @@ def get_context_stats(messages: list)->str:
     pct=int((total/MAX_CONTENT_CHARS)*100)
     bar="█" * (pct // 10) + "░" * (10 - pct // 10)
     return f"[CTX] {len(messages)} msgs | {total} chars | [{bar}] {pct}% of limit"
+# ════════════════════════════════════════════════════
+# PRIMITIVE 3: SELECT (combined with WRITE)
+#
+# Before writing the user message into context —
+# SELECT relevant memories and inject them above
+# the question.
+#
+# This is RAG in its simplest form:
+# Retrieve → Augment context → Generate answer
+# ════════════════════════════════════════════════════
+
+def write_with_memory(user_input: str, turn: int = 0) -> dict:
+    """
+    WRITE + SELECT combined.
+
+    1. SELECT relevant memories for this query
+    2. WRITE them above the user's question
+    3. Agent sees past knowledge before answering
+    """
+    relevant = memory.select_formatted(user_input, top_k=3)
+
+    if relevant:
+        content = f"{relevant}\n\nUser question: {user_input}"
+        print(f"[WRITE+SELECT] Memory injected into context")
+    else:
+        content = user_input
+
+    return {"role": "user", "content": content}

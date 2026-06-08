@@ -6,10 +6,11 @@ from google import genai
 from google.genai import types
 from groq import Groq
 from dotenv import load_dotenv
-
+from memory import memory
 from tools import dispatch_tool
 from context import (
     write_system_prompt,
+    write_with_memory,
     write_user_message,
     write_assistant_message,
     write_tool_result,
@@ -111,7 +112,7 @@ def run_agent(user_input: str) -> str:
     print(divider)
 
     system_prompt = write_system_prompt()
-    messages = [write_user_message(user_input)]
+    messages = [write_with_memory(user_input,turn=0)]
     tool_calls_made = []
 
     for step in range(1, MAX_STEPS + 1):
@@ -136,6 +137,14 @@ def run_agent(user_input: str) -> str:
             print(f"  │ 🔧 Tool: {tool_name}({repr(tool_input)})")
 
             result = dispatch_tool(tool_name, tool_input)
+            # Store result in memory for future SELECT retrieval
+            memory.add(
+                text=(f"Question: {user_input[:80]} | "
+                    f"Tool: {tool_name} | "
+                    f"Result: {result[:200]}"),
+                source=tool_name,
+                turn=step
+            )
             tool_calls_made.append({"tool": tool_name, "input": tool_input, "result": result})
 
             print(f"  │ 📤 Result: {result[:120]}{'...' if len(result) > 120 else ''}")
@@ -176,10 +185,16 @@ if __name__ == "__main__":
     print("=" * 52)
 
     questions = [
-        "What is 2 raised to the power 15, divided by the square root of 225?",
-        "What is a transformer model in machine learning? Give me a 2 line summary.",
-        "How many bones are in the human body, and what is the square root of that number?",
-    ]
+    # Q1: agent learns about transformers → stored in memory
+    "What is the transformer architecture "
+    "in machine learning?",
+
+    # Q2: SELECT should find Q1 memory — watch the logs
+    "How does GPT-3 use the transformer architecture?",
+
+    # Q3: math — SELECT should return low scores (unrelated)
+    "What is the square root of 144 multiplied by 3?",
+]
 
     for i, q in enumerate(questions, 1):
         print(f"\n[Question {i} of {len(questions)}]")
